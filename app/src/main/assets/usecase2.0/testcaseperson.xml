@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<algth name="PersonTest" id="00001">
+    <!--
+        id required 测试用例ID 唯一
+    -->
+    <test-description>测试用例描述，人工测试项</test-description>
+    <issuer-id>提测方id</issuer-id>
+    <issuer-name>提测方名字</issuer-name>
+    <issue-instant>提测时间</issue-instant>
+
+    <!-- <has-companyDevice>false</has-companyDevice>
+       <company-devicelist>
+       </company-devicelist>-->
+
+    <!--全局参数 -->
+    <global-params>
+        <!--
+            name  必填  参数名称
+            type  必填  default 生成脚本时填写  input 外部输入
+            参数值都是base64String格式
+        -->
+        <param name="paramname1" type="default">模块协同接口检测</param>
+        <param name="paramname2" type="default">陪测设备协同接口检测</param>
+        <param name="paramname3" type="default">签名协同性检测</param>
+        <param name="paramname4" type="default">互操作检测</param>
+        <param name="paramname5" type="default">中间件SDK</param>
+        <param name="paramname6" type="default">标准测试DEMO</param>
+        <param name="paramname7" type="default">SO库</param>
+    </global-params>
+
+
+
+    <actionlist enter="ac1" totalcount="2">
+        <!--   actionlist 标识测试活动集合，每个测试用例中只能包含一个actionlist， 属性：
+                  totalcount 必填  测试程序步骤总数
+                  enter      必填  测试程序入库
+        -->
+
+        <!-- 人工测试步骤 -->
+        <action count="" flow="6" id="ac1" next="" type="">
+            <!-- manual-type 人工测试类型   txt 文字  file 文件 -->
+            <manual-type>txt</manual-type>
+            <funcname>协议检测</funcname>
+            <funcid>方法ID</funcid>
+            <paramlist>
+
+                <param name="protocol1" type="global">paramname1</param>
+                <!-- 属性：
+				     name         必填  参数名称
+					 type         必填  参数来源
+					                    action 从别的action结果中获取，节点值为actionid
+					                    global 从全局参数获取，节点值为全局参照paramname
+								        input 测试人员手动输入，节点值为空
+                        -->
+
+                <param name="protocol2" type="global">paramname2</param>
+                <param name="protocol3" type="global">paramname3</param>
+                <param name="protocol4" type="global">paramname4</param>
+
+            </paramlist>
+        </action>
+
+        <action count="" flow="6" id="ac2" next="" type="">
+
+
+            <funcname>产品组成检测</funcname>
+            <funcid>方法ID</funcid><!-- funcid 人工测试类型   txt 文字  file 文件 -->
+            <paramlist>
+
+                <param name="protocol5" type="global">paramname5</param>
+                <!-- 属性：
+				     name         必填  参数名称
+					 type         必填  参数来源
+					                    action 从别的action结果中获取，节点值为actionid
+					                    global 从全局参数获取，节点值为全局参照paramname
+								        input 测试人员手动输入，节点值为空
+                        -->
+
+                <param name="protocol6" type="global">paramname6</param>
+                <param name="protocol7" type="global">paramname7</param>
+
+            </paramlist>
+        </action>
+
+    </actionlist>
+
+
+</algth>

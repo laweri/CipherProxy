@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<action count="" flow="1" funcid="" funcname="" id="ac1" next="ac2" type="">
+    <!--
+        action: 测试活动集合中的具体活动，属性:
+            id:     必填  活动的唯一标识
+            flow    必填  1 测试 2 基准 3 陪测  4 网络节点, 5 随机数检测平台 6 人工测试
+            type:   非必填  perform性能 ，normal 普通测试. 当flow=1,2,3,4,5时必填。
+            count   非必填  性能测试次数，性能测试必填
+            next    非必填  下一个需要执行的aciton对应ID,如果为空或end则结束
+    -->
+    <!-- 测试活动参数，每个action标签下只能有一个该标签 -->
+    <param name="seckey" type="global">paramname1</param>
+    <param name="mode" type="">CBC</param>
+    <!-- 属性：
+         name         必填  参数名称
+         type         必填  参数来源
+                            action 从别的action结果中获取，节点值为actionid
+                            global 从全局参数获取，节点值为全局参照paramname
+                            input 测试人员手动输入，节点值为空
+         参数值都转成base64
+         -->
+    <param name="text" type="">待加密明文</param>
+    <!--会输出加密后的密文-->
+</action>
