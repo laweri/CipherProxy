@@ -19,7 +19,7 @@ import java.util.Date;
  * Created by 吴腾飞 on 2019/4/24.
  */
 
-public class otherUtil {
+public class Base64Util {
     /**
      * String转base64String
      *

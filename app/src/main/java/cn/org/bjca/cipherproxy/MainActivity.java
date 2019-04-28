@@ -1,6 +1,7 @@
 package cn.org.bjca.cipherproxy;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -48,6 +49,8 @@ import okhttp3.Response;
 import okio.ByteString;
 
 import static cn.org.bjca.cipherproxy.utils.ParseXML.getActionBean;
+import static cn.org.bjca.cipherproxy.utils.Base64Util.base64ConvertStr;
+import static cn.org.bjca.cipherproxy.utils.Base64Util.strConvertBase64;
 
 public class
 MainActivity extends AppCompatActivity {
@@ -74,15 +77,19 @@ MainActivity extends AppCompatActivity {
         @Override
         public void onMessage(String text) {
             Log.d(TAG, "WsManager-----onMessage");
-            int command = 0;
-            JSONObject jsonObject;
             try {
-                jsonObject = new JSONObject(text);
-                command = (int) jsonObject.get("command");
+                JSONObject jsonObject = new JSONObject(text);//外部json
+                int command = (int) jsonObject.get("command");
+                String data = (String) jsonObject.get("data");
+
+                String jsonString = base64ConvertStr(data);
+                JSONObject innerJsonObject = new JSONObject(jsonString);//内部json
 
                 if (command == 10001) {//注册结果
 
-                    int resultCode = (int) jsonObject.get("resultCode");
+                    int resultCode = (int) innerJsonObject.get("resultCode");
+                    String resultMsg = (String) innerJsonObject.get("resultMsg");
+
                     if (resultCode == 1) {
                         Toast.makeText(MainActivity.this, "Success", Toast.LENGTH_SHORT).show();
                     } else if (resultCode == 0)
@@ -90,22 +97,29 @@ MainActivity extends AppCompatActivity {
                     else Log.e("result", "命令错误,或json串错误");
                 }
                 if (command == 10002) {//绑定命令
-                    String taskId = (String) jsonObject.get("taskId");
-
+                    String taskId = (String) innerJsonObject.get("taskId");
+                    bindResult(taskId);
                 }
                 if (command == 10004) {//解绑命令
-                    String taskId = (String) jsonObject.get("taskId");
+                    String taskId = (String) innerJsonObject.get("taskId");
+                    SharedPreferences share = getSharedPreferences("CIPHER_PROXY", MODE_PRIVATE);
+                    SharedPreferences.Editor editor = share.edit();
+                    String oldTaskId = share.getString("taskId", "");
+                    if (oldTaskId.equals(taskId)) {
+                        editor.remove("taskId");
+                        editor.apply();
+                    }
                 }
                 if (command == 10005) {//安装apk
-                    //    String url = (String) jsonObject.get("path");
+                    //    String url = (String) innerJsonObject.get("path");
                     String url = "https://ss2.bdstatic.com/70cFvnSh_Q1YnxGkpoWK1HF6hhy/it/u=3803697947,2311042153&fm=11&gp=0.jpg";
 
                     downloadFile(url);
                     //TODO 下载apk并安装
                 }
                 if (command == 10007) {//测试命令
-                    String content = (String) jsonObject.get("content");
-                    String str = content.substring(21);//去掉base64的头部 data:text/xml;base64,
+                    String action = (String) innerJsonObject.get("action");
+                    String str = action.substring(21);//去掉base64的头部 data:text/xml;base64,
                     byte[] bytes = Base64.decode(str, Base64.NO_WRAP);// 将字符串转换为byte数组
                     ByteArrayInputStream in = new ByteArrayInputStream(bytes);
 
@@ -161,6 +175,85 @@ MainActivity extends AppCompatActivity {
                     ContextCompat.getColor(getBaseContext(), android.R.color.holo_red_light))));
         }
     };
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        initView();
+    }
+
+    private void initView() {
+        et_url = findViewById(R.id.et_url);
+        btn_connect = findViewById(R.id.btn_connect);
+        btn_disconnect = findViewById(R.id.btn_disconnect);
+        btn_download = findViewById(R.id.btn_download);
+        btn_install = findViewById(R.id.btn_install);
+        tv_content = findViewById(R.id.tv_content);
+        progress = findViewById(R.id.progress);
+
+    }
+
+    public void connect(View view) {
+        String url = et_url.getText().toString();
+        if (!TextUtils.isEmpty(url) && url.contains("ws")) {
+            if (wsManager != null) {
+                wsManager.stopConnect();
+                wsManager = null;
+            }
+            wsManager = new WsManager.Builder(getBaseContext()).client(
+                    new OkHttpClient().newBuilder()
+                            .pingInterval(15, TimeUnit.SECONDS)
+                            .retryOnConnectionFailure(true)
+                            .build())
+                    .needReconnect(true)
+                    .wsUrl(url)
+                    .build();
+            wsManager.setWsStatusListener(wsStatusListener);
+            wsManager.startConnect();
+        } else {
+            Toast.makeText(getBaseContext(), "请填写需要连接的地址", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void bindResult(String taskId) {
+        SharedPreferences share = getSharedPreferences("CIPHER_PROXY", MODE_PRIVATE);
+        SharedPreferences.Editor editor = share.edit();
+        String oldTaskId = share.getString("taskId", "");
+
+        if (oldTaskId.equals("")) {
+            editor.putString("taskId", taskId);
+            editor.apply();
+            wsManager.sendMessage(sendResultJson(1, "绑定成功"));
+            Log.e("bind", "绑定成功");
+        } else {
+            if (oldTaskId.equals(taskId))
+                wsManager.sendMessage(sendResultJson(1, "重连成功"));
+            Log.e("bind", "重连成功");
+            if (!oldTaskId.equals(taskId))
+                wsManager.sendMessage(sendResultJson(1, "不重连"));
+            Log.e("bind", "不重连");
+        }
+    }
+
+    private String sendResultJson(int resultCode, String resultMsg) {
+        String resultJson = "";
+        try {
+            JSONObject innerJsonObject = new JSONObject();//内部json
+            innerJsonObject.put("resultCode", resultCode);
+            innerJsonObject.put("resultMsg", resultMsg);
+            String innerJsonBase64 = strConvertBase64(innerJsonObject.toString());
+
+            JSONObject jsonObject = new JSONObject();//外部json
+            jsonObject.put("command", 10003);
+            jsonObject.put("data", innerJsonBase64);
+            resultJson = jsonObject.toString();
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        return resultJson;
+    }
+
 
     private void downloadFile(String url) {
         DownloadManager.getInstance().download(url, new DownLoadObserver() {
@@ -218,47 +311,6 @@ MainActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        initView();
-
-    }
-
-    private void initView() {
-        et_url = findViewById(R.id.et_url);
-        btn_connect = findViewById(R.id.btn_connect);
-        btn_disconnect = findViewById(R.id.btn_disconnect);
-        btn_download = findViewById(R.id.btn_download);
-        btn_install = findViewById(R.id.btn_install);
-        tv_content = findViewById(R.id.tv_content);
-        progress = findViewById(R.id.progress);
-
-    }
-
-
-    public void connect(View view) {
-        String url = et_url.getText().toString();
-        if (!TextUtils.isEmpty(url) && url.contains("ws")) {
-            if (wsManager != null) {
-                wsManager.stopConnect();
-                wsManager = null;
-            }
-            wsManager = new WsManager.Builder(getBaseContext()).client(
-                    new OkHttpClient().newBuilder()
-                            .pingInterval(15, TimeUnit.SECONDS)
-                            .retryOnConnectionFailure(true)
-                            .build())
-                    .needReconnect(true)
-                    .wsUrl(url)
-                    .build();
-            wsManager.setWsStatusListener(wsStatusListener);
-            wsManager.startConnect();
-        } else {
-            Toast.makeText(getBaseContext(), "请填写需要连接的地址", Toast.LENGTH_SHORT).show();
-        }
-    }
 
     public void sendMsg(View view) {
         wsManager.sendMessage("Hello, I am clint");
@@ -266,16 +318,19 @@ MainActivity extends AppCompatActivity {
 
     public void register(View view) {
         JSONObject jsonObject = new JSONObject();
+        JSONObject innerJsonObject = new JSONObject();
         try {
+            innerJsonObject.put("type", 1);
+            innerJsonObject.put("mac", "device_tag_1234567890");
+            innerJsonObject.put("name", "xiaomi 5");
+            innerJsonObject.put("taskId", "");//任务ID绑定时才有，用于断线重连
+            String base64 = strConvertBase64(innerJsonObject.toString());
+
             jsonObject.put("command", 10000);
-            jsonObject.put("type", 1);
-            jsonObject.put("mac", "device_tag_1234567890");
-            jsonObject.put("name", "00001");
-            jsonObject.put("taskId", "");
+            jsonObject.put("data", base64);
         } catch (JSONException e) {
             e.printStackTrace();
         }
-
         wsManager.sendMessage(jsonObject.toString());
     }
 
