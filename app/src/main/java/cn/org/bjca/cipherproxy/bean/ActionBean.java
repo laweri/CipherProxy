@@ -6,19 +6,8 @@ import java.util.List;
  * Created by 吴腾飞 on 2019/4/25.
  */
 
-public class Action {
 
-    private ActionBean action;
-
-    public ActionBean getAction() {
-        return action;
-    }
-
-    public void setAction(ActionBean action) {
-        this.action = action;
-    }
-
-    public static class ActionBean {
+    public  class ActionBean {
         private String next;
         private String funcname;
         private String count;
@@ -122,4 +111,4 @@ public class Action {
             }
         }
     }
-}
+

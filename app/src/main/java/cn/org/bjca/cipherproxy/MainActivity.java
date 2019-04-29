@@ -1,14 +1,19 @@
 package cn.org.bjca.cipherproxy;
 
+import android.app.Service;
+import android.content.ComponentName;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Environment;
+import android.os.IBinder;
+import android.os.RemoteException;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.text.Html;
 import android.text.Spanned;
 import android.text.TextUtils;
@@ -16,13 +21,13 @@ import android.text.format.DateUtils;
 import android.text.style.ForegroundColorSpan;
 import android.util.Base64;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-
 
 import com.google.gson.Gson;
 
@@ -36,7 +41,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.TimeUnit;
 
-import cn.org.bjca.cipherproxy.bean.Action;
+import cn.org.bjca.ciphermodule.CipherAidlInterface;
+import cn.org.bjca.cipherproxy.bean.ActionBean;
 import cn.org.bjca.cipherproxy.updownload.DownLoadObserver;
 import cn.org.bjca.cipherproxy.updownload.DownloadInfo;
 import cn.org.bjca.cipherproxy.updownload.DownloadManager;
@@ -44,13 +50,13 @@ import cn.org.bjca.cipherproxy.websocket.Spanny;
 import cn.org.bjca.cipherproxy.websocket.WsManager;
 import cn.org.bjca.cipherproxy.websocket.WsStatusListener;
 import okhttp3.OkHttpClient;
-
 import okhttp3.Response;
 import okio.ByteString;
 
-import static cn.org.bjca.cipherproxy.utils.ParseXML.getActionBean;
 import static cn.org.bjca.cipherproxy.utils.Base64Util.base64ConvertStr;
 import static cn.org.bjca.cipherproxy.utils.Base64Util.strConvertBase64;
+import static cn.org.bjca.cipherproxy.utils.Obj2Json.toJson;
+import static cn.org.bjca.cipherproxy.utils.ParseXML.getActionBean;
 
 public class
 MainActivity extends AppCompatActivity {
@@ -79,29 +85,27 @@ MainActivity extends AppCompatActivity {
             Log.d(TAG, "WsManager-----onMessage");
             try {
                 JSONObject jsonObject = new JSONObject(text);//外部json
-                int command = (int) jsonObject.get("command");
-                String data = (String) jsonObject.get("data");
+                int command = Integer.parseInt(jsonObject.optString("command", "0"));
+                String data = jsonObject.optString("data");
 
                 String jsonString = base64ConvertStr(data);
                 JSONObject innerJsonObject = new JSONObject(jsonString);//内部json
 
                 if (command == 10001) {//注册结果
 
-                    int resultCode = (int) innerJsonObject.get("resultCode");
-                    String resultMsg = (String) innerJsonObject.get("resultMsg");
+                    int resultCode = Integer.parseInt(innerJsonObject.optString("resultCode"));
+                    String resultMsg = innerJsonObject.optString("resultMsg");
 
                     if (resultCode == 1) {
-                        Toast.makeText(MainActivity.this, "Success", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "注册成功", Toast.LENGTH_SHORT).show();
                     } else if (resultCode == 0)
-                        Toast.makeText(MainActivity.this, "Fail", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "注册失败", Toast.LENGTH_SHORT).show();
                     else Log.e("result", "命令错误,或json串错误");
-                }
-                if (command == 10002) {//绑定命令
-                    String taskId = (String) innerJsonObject.get("taskId");
+                } else if (command == 10002) {//绑定命令
+                    String taskId = innerJsonObject.optString("taskId");
                     bindResult(taskId);
-                }
-                if (command == 10004) {//解绑命令
-                    String taskId = (String) innerJsonObject.get("taskId");
+                } else if (command == 10004) {//解绑命令
+                    String taskId = innerJsonObject.optString("taskId");
                     SharedPreferences share = getSharedPreferences("CIPHER_PROXY", MODE_PRIVATE);
                     SharedPreferences.Editor editor = share.edit();
                     String oldTaskId = share.getString("taskId", "");
@@ -109,22 +113,26 @@ MainActivity extends AppCompatActivity {
                         editor.remove("taskId");
                         editor.apply();
                     }
-                }
-                if (command == 10005) {//安装apk
+                } else if (command == 10005) {//安装apk
                     //    String url = (String) innerJsonObject.get("path");
                     String url = "https://ss2.bdstatic.com/70cFvnSh_Q1YnxGkpoWK1HF6hhy/it/u=3803697947,2311042153&fm=11&gp=0.jpg";
 
                     downloadFile(url);
                     //TODO 下载apk并安装
-                }
-                if (command == 10007) {//测试命令
-                    String action = (String) innerJsonObject.get("action");
-                    String str = action.substring(21);//去掉base64的头部 data:text/xml;base64,
-                    byte[] bytes = Base64.decode(str, Base64.NO_WRAP);// 将字符串转换为byte数组
+                } else if (command == 10007) {//测试命令
+                    String action = innerJsonObject.optString("action");
+                    // String str = action.substring(21);//去掉base64的头部 data:text/xml;base64,
+                    byte[] bytes = Base64.decode(action, Base64.NO_WRAP);// 将字符串转换为byte数组
                     ByteArrayInputStream in = new ByteArrayInputStream(bytes);
 
-                    Action.ActionBean actionBean = getActionBean(in);
-                    System.out.println(actionBean);
+                    ActionBean actionBean = getActionBean(in);
+
+                    String json = toJson(actionBean);
+                    Log.e("msg", json);
+                    sendJson2TestApp(json, actionBean.getId());
+                    Log.e("msg", actionBean.getId() + "" + actionBean.getParam());
+                } else {
+                    Log.e("msg", "命令错误");
                 }
 
 
@@ -175,13 +183,31 @@ MainActivity extends AppCompatActivity {
                     ContextCompat.getColor(getBaseContext(), android.R.color.holo_red_light))));
         }
     };
+    private CipherAidlInterface cipherInterface;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         initView();
+        Intent intent = new Intent();
+        intent.setAction("cn.org.bjca.ciphermodule.CipherService");
+        intent.setPackage("cn.org.bjca.ciphermodule");
+        bindService(intent, connection, Service.BIND_AUTO_CREATE);
+
     }
+
+    ServiceConnection connection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            cipherInterface = CipherAidlInterface.Stub.asInterface(service);
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+
+        }
+    };
 
     private void initView() {
         et_url = findViewById(R.id.et_url);
@@ -316,6 +342,55 @@ MainActivity extends AppCompatActivity {
         wsManager.sendMessage("Hello, I am clint");
     }
 
+    public void sendJson2TestApp(String json, String actionid) {
+        SharedPreferences share = getSharedPreferences("CIPHER_PROXY", MODE_PRIVATE);
+        String taskId = share.getString("taskId", "");
+        String result = null;
+        try {
+            result = cipherInterface.invokingInterface(json);
+
+
+            JSONObject innerJsonObject = new JSONObject();//内部json
+            innerJsonObject.put("resultCode", 1);
+            innerJsonObject.put("resultMsg", "测试成功");
+            innerJsonObject.put("taskId", taskId);
+            innerJsonObject.put("actionId", actionid);
+            innerJsonObject.put("result", result);
+            String innerJsonBase64 = strConvertBase64(innerJsonObject.toString());
+
+            JSONObject jsonObject = new JSONObject();//外部json
+            jsonObject.put("command", 10008);
+            jsonObject.put("data", innerJsonBase64);
+            String resultJson = jsonObject.toString();
+
+            wsManager.sendMessage(resultJson);
+            Log.e("result", result);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+            JSONObject innerJsonObject = new JSONObject();//内部json
+            try {
+                innerJsonObject.put("resultCode", 0);
+                innerJsonObject.put("resultMsg", "测试失败");
+                innerJsonObject.put("taskId", taskId);
+                innerJsonObject.put("actionId", actionid);
+                innerJsonObject.put("result", result);
+                String innerJsonBase64 = strConvertBase64(innerJsonObject.toString());
+
+                JSONObject jsonObject = new JSONObject();//外部json
+                jsonObject.put("command", 10008);
+                jsonObject.put("data", innerJsonBase64);
+                String resultJson = jsonObject.toString();
+                wsManager.sendMessage(resultJson);
+            } catch (JSONException e1) {
+                e1.printStackTrace();
+            }
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+
     public void register(View view) {
         JSONObject jsonObject = new JSONObject();
         JSONObject innerJsonObject = new JSONObject();
@@ -349,7 +424,7 @@ MainActivity extends AppCompatActivity {
         String fileName = "testcaseEnDecrypt.xml"; //文件名字
         try {
             InputStream in = getResources().getAssets().open(fileName);
-            Action.ActionBean actionBean = getActionBean(in);
+            ActionBean actionBean = getActionBean(in);
             System.out.println(
                     actionBean.getCount() + "--" +
                             actionBean.getId() + "--" +
@@ -381,6 +456,16 @@ MainActivity extends AppCompatActivity {
             wsManager.stopConnect();
             wsManager = null;
         }
+    }
+
+    //点击返回键时不销毁activity
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            moveTaskToBack(true);
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
     }
 
     @Override

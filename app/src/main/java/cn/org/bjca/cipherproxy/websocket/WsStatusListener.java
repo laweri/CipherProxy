@@ -1,7 +1,5 @@
 package cn.org.bjca.cipherproxy.websocket;
 
-import org.json.JSONException;
-
 import okhttp3.Response;
 import okio.ByteString;
 

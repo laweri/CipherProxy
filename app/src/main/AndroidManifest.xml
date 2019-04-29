@@ -14,22 +14,17 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:persistent="true"
         android:theme="@style/AppTheme">
         <activity
-            android:name=".MainActivity"
+            android:name="cn.org.bjca.cipherproxy.MainActivity"
             android:screenOrientation="portrait">
-            <intent-filter>
+            <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <service android:name=".MyService">
-            <intent-filter>
-                <action android:name="cn.org.bjca.cipherproxy.MyService" />
-            </intent-filter>
-        </service>
 
         <provider
             android:name="android.support.v4.content.FileProvider"

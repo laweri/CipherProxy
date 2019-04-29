@@ -1,24 +1,22 @@
 package cn.org.bjca.cipherproxy.utils;
 
 import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import cn.org.bjca.cipherproxy.bean.Action;
-import cn.org.bjca.cipherproxy.bean.Encrypt;
+import cn.org.bjca.cipherproxy.bean.ActionBean;
+
 
 /**
  * Created by 吴腾飞 on 2019/3/25.
  */
 
 public class ParseXML {
-    private static Action.ActionBean actionBean;
-    private static List<Action.ActionBean.ParamBean> paramBeanList;
+    private static ActionBean actionBean;
+    private static List<ActionBean.ParamBean> paramBeanList;
     // private static Encrypt.ActionBean actionBean;
     //  private static List<Encrypt.ActionBean.ParamlistBean.ParamBean> paramBeanList;
 
@@ -98,7 +96,7 @@ public class ParseXML {
 //        return actionBean;
 //    }
 
-    public static Action.ActionBean getActionBean(InputStream inStream) throws Throwable {
+    public static ActionBean getActionBean(InputStream inStream) throws Throwable {
 
         //========创建XmlPullParser,有两种方式=======
         //方式一:使用工厂类XmlPullParserFactory
@@ -116,7 +114,7 @@ public class ParseXML {
             switch (eventType) {
                 //触发开始文档事件
                 case XmlPullParser.START_DOCUMENT:
-                    actionBean = new Action.ActionBean();
+                    actionBean = new ActionBean();
                     paramBeanList = new ArrayList<>();
                     break;
                 //触发开始元素事件
@@ -134,7 +132,7 @@ public class ParseXML {
                         actionBean.setFuncname(parser.getAttributeValue(null, "funcname"));
                     }
                     if ("param".equals(name)) {
-                        Action.ActionBean.ParamBean paramBean = new Action.ActionBean.ParamBean();
+                        ActionBean.ParamBean paramBean = new ActionBean.ParamBean();
                         paramBean.setName(parser.getAttributeValue(null, "name"));
                         paramBean.setType(parser.getAttributeValue(null, "type"));
                         paramBean.setContent(parser.nextText());

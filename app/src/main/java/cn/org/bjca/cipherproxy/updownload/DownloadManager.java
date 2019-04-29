@@ -2,7 +2,6 @@ package cn.org.bjca.cipherproxy.updownload;
 
 import android.os.Environment;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
